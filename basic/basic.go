@@ -126,9 +126,13 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 
+	mountName, err := d.EventHandler.GetMountName(d, r)
+	if err != nil {
+		return err
+	}
 	v := &Volume{
 		Options:     r.Options,
-		Mount:       d.EventHandler.GetMountName(d, r),
+		Mount:       mountName,
 		Connections: 0,
 	}
 
