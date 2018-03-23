@@ -62,37 +62,37 @@ func (v *Volume) GetStatus() map[string]interface{} {
 
 //Driver the global driver responding to call
 type Driver struct {
-	lock          sync.RWMutex
-	root          string
-	mountUniqName bool
-	persistence   *viper.Viper
-	volumes       map[string]*Volume
-	mounts        map[string]*Mountpoint
-	cfgfolder     string
-	version       int
+	Lock          sync.RWMutex
+	Root          string
+	MountUniqName bool
+	Persistence   *viper.Viper
+	Volumes       map[string]*Volume
+	Mounts        map[string]*Mountpoint
+	CfgFolder     string
+	Version       int
 }
 
 func (d *Driver) GetVolumes() map[string]driver.Volume {
-	vi := make(map[string]driver.Volume, len(d.volumes))
-	for k, i := range d.volumes {
+	vi := make(map[string]driver.Volume, len(d.Volumes))
+	for k, i := range d.Volumes {
 		vi[k] = i
 	}
 	return vi
 }
 
 func (d *Driver) GetMounts() map[string]driver.Mount {
-	mi := make(map[string]driver.Mount, len(d.mounts))
-	for k, i := range d.mounts {
+	mi := make(map[string]driver.Mount, len(d.Mounts))
+	for k, i := range d.Mounts {
 		mi[k] = i
 	}
 	return mi
 }
 
 func (d *Driver) GetLock() *sync.RWMutex {
-	return &d.lock
+	return &d.Lock
 }
 
-//List volumes handled by these driver
+//List Volumes handled by these driver
 func (d *Driver) List() (*volume.ListResponse, error) {
 	return driver.List(d)
 }
@@ -132,7 +132,7 @@ func (d *Driver) RunCmd(cmd string) error {
 	return err
 }
 
-//Persistence represent struct of persistence file
+//Persistence represent struct of Persistence file
 type Persistence struct {
 	Version int                    `json:"version"`
 	Volumes map[string]*Volume     `json:"volumes"`
@@ -141,25 +141,25 @@ type Persistence struct {
 
 //SaveConfig stroe config/state in file
 func (d *Driver) SaveConfig() error {
-	fi, err := os.Lstat(d.cfgfolder)
+	fi, err := os.Lstat(d.CfgFolder)
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(d.cfgfolder, 0700); err != nil {
+		if err = os.MkdirAll(d.CfgFolder, 0700); err != nil {
 			return fmt.Errorf("SaveConfig: %s", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	if fi != nil && !fi.IsDir() {
-		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.root)
+		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.Root)
 	}
-	b, err := json.Marshal(Persistence{Version: d.version, Volumes: d.volumes, Mounts: d.mounts})
+	b, err := json.Marshal(Persistence{Version: d.Version, Volumes: d.Volumes, Mounts: d.Mounts})
 	if err != nil {
-		logrus.Warn("Unable to encode persistence struct, %v", err)
+		logrus.Warn("Unable to encode Persistence struct, %v", err)
 	}
-	//logrus.Debug("Writing persistence struct, %v", b, d.volumes)
-	err = ioutil.WriteFile(d.cfgfolder+"/persistence.json", b, 0600)
+	//logrus.Debug("Writing Persistence struct, %v", b, d.Volumes)
+	err = ioutil.WriteFile(d.CfgFolder+"/Persistence.json", b, 0600)
 	if err != nil {
-		logrus.Warn("Unable to write persistence struct, %v", err)
+		logrus.Warn("Unable to write Persistence struct, %v", err)
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	return nil
