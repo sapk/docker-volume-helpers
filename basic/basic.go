@@ -180,9 +180,9 @@ func (d *Driver) RunCmd(cmd string) error {
 	logrus.Debugf(cmd)
 	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		logrus.Debugf("Error: %v", err)
+		logrus.Warnf("Error: %s", err)
 	}
-	logrus.Debugf("Output: %v", out)
+	logrus.Warnf("Output: %s", out)
 	return err
 }
 
