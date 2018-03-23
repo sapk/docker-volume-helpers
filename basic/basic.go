@@ -87,6 +87,7 @@ type DriverConfig struct {
 	Root          string
 	MountUniqName bool
 	Folder        string
+	CustomOptions map[string]string
 }
 
 //DriverEventHandler contains function to execute on event
