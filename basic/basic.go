@@ -211,7 +211,7 @@ func (d *Driver) SaveConfig() error {
 		logrus.Warn("Unable to encode Persistence struct, %v", err)
 	}
 	//logrus.Debug("Writing Persistence struct, %v", b, d.Volumes)
-	err = ioutil.WriteFile(d.CfgFolder+"/Persistence.json", b, 0600)
+	err = ioutil.WriteFile(d.CfgFolder+"/persistence.json", b, 0600)
 	if err != nil {
 		logrus.Warn("Unable to write Persistence struct, %v", err)
 		return fmt.Errorf("SaveConfig: %s", err)
