@@ -92,7 +92,7 @@ type DriverConfig struct {
 //DriverEventHandler contains function to execute on event
 type DriverEventHandler struct {
 	IsValidURI    func(string) bool
-	OnInit        func(*Driver) (*volume.MountResponse, error)
+	OnInit        func(*Driver) error
 	OnMountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
 }
 
@@ -313,6 +313,11 @@ func Init(config *DriverConfig, eventHandler *DriverEventHandler) *Driver {
 				logrus.Warn("Unable to decode into struct -> start with empty list, %v", err)
 				d.Mounts = make(map[string]*Mountpoint)
 			}
+		}
+	}
+	if d.EventHandler.OnInit != nil {
+		if err := d.EventHandler.OnInit(d); err != nil {
+			logrus.Fatalf("Failed to execute OnInit event handler", err)
 		}
 	}
 	return d
