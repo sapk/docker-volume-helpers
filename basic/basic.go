@@ -17,41 +17,50 @@ import (
 	"github.com/docker/go-plugins-helpers/volume"
 )
 
+//Mountpoint represent a docker volume mountpoint
 type Mountpoint struct {
 	Path        string `json:"path"`
 	Connections int    `json:"connections"`
 }
 
+//GetPath get path of mount
 func (d *Mountpoint) GetPath() string {
 	return d.Path
 }
 
+//GetConnections get number of connection on mount
 func (d *Mountpoint) GetConnections() int {
 	return d.Connections
 }
 
+//SetConnections set number of connection on mount
 func (d *Mountpoint) SetConnections(n int) {
 	d.Connections = n
 }
 
+//Volume represent a docker volume
 type Volume struct {
 	VolumeURI   string `json:"voluri"`
 	Mount       string `json:"mount"`
 	Connections int    `json:"connections"`
 }
 
+//GetMount get mount of volume
 func (v *Volume) GetMount() string {
 	return v.Mount
 }
 
+//GetRemote get remote definition of volume
 func (v *Volume) GetRemote() string {
 	return v.VolumeURI
 }
 
+//GetConnections get number of connection on volume
 func (v *Volume) GetConnections() int {
 	return v.Connections
 }
 
+//SetConnections set number of connection on volume
 func (v *Volume) SetConnections(n int) {
 	v.Connections = n
 }
@@ -64,18 +73,30 @@ func (v *Volume) GetStatus() map[string]interface{} {
 
 //Driver the global driver responding to call
 type Driver struct {
-	Lock          sync.RWMutex
-	Root          string
-	MountUniqName bool
-	Persistence   *viper.Viper
-	Volumes       map[string]*Volume
-	Mounts        map[string]*Mountpoint
-	CfgFolder     string
-	Version       int
-	IsValidURI    func(string) bool
-	MountVolume   func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
+	Lock         sync.RWMutex
+	Persistence  *viper.Viper
+	Volumes      map[string]*Volume
+	Mounts       map[string]*Mountpoint
+	Config       DriverConfig
+	EventHandler DriverEventHandler
 }
 
+//DriverConfig contains configration of driver
+type DriverConfig struct {
+	Version       int
+	Root          string
+	MountUniqName bool
+	Folder        string
+}
+
+//DriverEventHandler contains function to execute on event
+type DriverEventHandler struct {
+	IsValidURI    func(string) bool
+	OnInit        func(*Driver) (*volume.MountResponse, error)
+	OnMountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
+}
+
+//GetVolumes list volumes of driver
 func (d *Driver) GetVolumes() map[string]driver.Volume {
 	vi := make(map[string]driver.Volume, len(d.Volumes))
 	for k, i := range d.Volumes {
@@ -84,6 +105,7 @@ func (d *Driver) GetVolumes() map[string]driver.Volume {
 	return vi
 }
 
+//GetMounts list mounts of driver
 func (d *Driver) GetMounts() map[string]driver.Mount {
 	mi := make(map[string]driver.Mount, len(d.Mounts))
 	for k, i := range d.Mounts {
@@ -92,6 +114,7 @@ func (d *Driver) GetMounts() map[string]driver.Mount {
 	return mi
 }
 
+//GetLock list lock of driver
 func (d *Driver) GetLock() *sync.RWMutex {
 	return &d.Lock
 }
@@ -104,7 +127,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		return fmt.Errorf("voluri option required")
 	}
 	r.Options["voluri"] = strings.Trim(r.Options["voluri"], "\"")
-	if !d.IsValidURI(r.Options["voluri"]) {
+	if !d.EventHandler.IsValidURI(r.Options["voluri"]) {
 		return fmt.Errorf("voluri option is malformated")
 	}
 
@@ -119,7 +142,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 
 	if _, ok := d.Mounts[v.Mount]; !ok { //This mountpoint doesn't allready exist -> create it
 		m := &Mountpoint{
-			Path:        filepath.Join(d.Root, v.Mount),
+			Path:        filepath.Join(d.Config.Root, v.Mount),
 			Connections: 0,
 		}
 
@@ -195,23 +218,23 @@ type Persistence struct {
 
 //SaveConfig stroe config/state in file
 func (d *Driver) SaveConfig() error {
-	fi, err := os.Lstat(d.CfgFolder)
+	fi, err := os.Lstat(d.Config.Folder)
 	if os.IsNotExist(err) {
-		if err = os.MkdirAll(d.CfgFolder, 0700); err != nil {
+		if err = os.MkdirAll(d.Config.Folder, 0700); err != nil {
 			return fmt.Errorf("SaveConfig: %s", err)
 		}
 	} else if err != nil {
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	if fi != nil && !fi.IsDir() {
-		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.Root)
+		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.Config.Root)
 	}
-	b, err := json.Marshal(Persistence{Version: d.Version, Volumes: d.Volumes, Mounts: d.Mounts})
+	b, err := json.Marshal(Persistence{Version: d.Config.Version, Volumes: d.Volumes, Mounts: d.Mounts})
 	if err != nil {
 		logrus.Warn("Unable to encode Persistence struct, %v", err)
 	}
 	//logrus.Debug("Writing Persistence struct, %v", b, d.Volumes)
-	err = ioutil.WriteFile(d.CfgFolder+"/persistence.json", b, 0600)
+	err = ioutil.WriteFile(d.Config.Folder+"/persistence.json", b, 0600)
 	if err != nil {
 		logrus.Warn("Unable to write Persistence struct, %v", err)
 		return fmt.Errorf("SaveConfig: %s", err)
@@ -243,7 +266,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 
-	resp, err := d.MountVolume(d, v, m, r)
+	resp, err := d.EventHandler.OnMountVolume(d, v, m, r)
 	if err != nil {
 		return nil, err
 	}
@@ -253,25 +276,21 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 }
 
 //Init load configuration and serve response to API call
-func Init(root string, mountUniqName bool, CfgFolder string, CfgVersion int, isValidURI func(string) bool, mountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)) *Driver {
-	logrus.Debugf("Init basic driver at %s, UniqName: %v", root, mountUniqName)
+func Init(config DriverConfig, eventHandler DriverEventHandler) *Driver {
+	logrus.Debugf("Init basic driver at %s, UniqName: %v", config.Root, config.MountUniqName)
 	d := &Driver{
-		Root:          root,
-		MountUniqName: mountUniqName,
-		Persistence:   viper.New(),
-		Volumes:       make(map[string]*Volume),
-		Mounts:        make(map[string]*Mountpoint),
-		CfgFolder:     CfgFolder,
-		Version:       CfgVersion,
-		IsValidURI:    isValidURI,
-		MountVolume:   mountVolume,
+		Config:       config,
+		Persistence:  viper.New(),
+		Volumes:      make(map[string]*Volume),
+		Mounts:       make(map[string]*Mountpoint),
+		EventHandler: eventHandler,
 	}
 
 	d.Persistence.SetDefault("volumes", map[string]*Volume{})
 	d.Persistence.SetDefault("mounts", map[string]*Mountpoint{})
 	d.Persistence.SetConfigName("persistence")
 	d.Persistence.SetConfigType("json")
-	d.Persistence.AddConfigPath(CfgFolder)
+	d.Persistence.AddConfigPath(d.Config.Folder)
 	if err := d.Persistence.ReadInConfig(); err != nil { // Handle errors reading the config file
 		logrus.Warn("No persistence file found, I will start with a empty list of volume.", err)
 	} else {
@@ -279,7 +298,7 @@ func Init(root string, mountUniqName bool, CfgFolder string, CfgVersion int, isV
 
 		var version int
 		err := d.Persistence.UnmarshalKey("version", &version)
-		if err != nil || version != CfgVersion {
+		if err != nil || version != d.Config.Version {
 			logrus.Warn("Unable to decode version of persistence, %v", err)
 			d.Volumes = make(map[string]*Volume)
 			d.Mounts = make(map[string]*Mountpoint)

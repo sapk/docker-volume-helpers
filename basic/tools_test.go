@@ -8,7 +8,9 @@ import (
 
 func TestMountName(t *testing.T) {
 	name := GetMountName(&Driver{
-		mountUniqName: false,
+		Config: DriverConfig{
+			MountUniqName: false,
+		},
 	}, &volume.CreateRequest{
 		Name: "test",
 		Options: map[string]string{
@@ -21,7 +23,9 @@ func TestMountName(t *testing.T) {
 	}
 
 	nameuniq := GetMountName(&Driver{
-		mountUniqName: true,
+		Config: DriverConfig{
+			MountUniqName: true,
+		},
 	}, &volume.CreateRequest{
 		Name: "test",
 		Options: map[string]string{
