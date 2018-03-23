@@ -65,7 +65,7 @@ type Driver struct {
 	lock          sync.RWMutex
 	root          string
 	mountUniqName bool
-	persitence    *viper.Viper
+	persistence   *viper.Viper
 	volumes       map[string]*Volume
 	mounts        map[string]*Mountpoint
 	cfgfolder     string
@@ -163,4 +163,13 @@ func (d *Driver) SaveConfig() error {
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	return nil
+}
+
+//Path get path of the requested volume
+func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
+	_, m, err := driver.Get(d, r.Name)
+	if err != nil {
+		return nil, err
+	}
+	return &volume.PathResponse{Mountpoint: m.GetPath()}, nil
 }
