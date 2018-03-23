@@ -10,7 +10,7 @@ import (
 
 //GetMountName get moint point base on request and driver config (mountUniqName)
 func GetMountName(d *Driver, r *volume.CreateRequest) string {
-	if d.mountUniqName {
+	if d.MountUniqName {
 		return url.PathEscape(r.Options["voluri"])
 	}
 	return url.PathEscape(r.Name)
