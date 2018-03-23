@@ -228,7 +228,7 @@ func (d *Driver) SaveConfig() error {
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	if fi != nil && !fi.IsDir() {
-		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.Config.Root)
+		return fmt.Errorf("SaveConfig: %v already exist and it's not a directory", d.Config.Folder)
 	}
 	b, err := json.Marshal(Persistence{Version: d.Config.Version, Volumes: d.Volumes, Mounts: d.Mounts})
 	if err != nil {
