@@ -90,10 +90,9 @@ type DriverConfig struct {
 
 //DriverEventHandler contains function to execute on event
 type DriverEventHandler struct {
-	IsValidURI    func(string) bool
 	OnInit        func(*Driver) error
-	GetMountName  func(d *Driver, r *volume.CreateRequest) (string, error)
 	OnMountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
+	GetMountName  func(d *Driver, r *volume.CreateRequest) (string, error)
 }
 
 //GetVolumes list volumes of driver
