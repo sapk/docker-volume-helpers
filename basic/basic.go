@@ -77,8 +77,8 @@ type Driver struct {
 	Persistence  *viper.Viper
 	Volumes      map[string]*Volume
 	Mounts       map[string]*Mountpoint
-	Config       DriverConfig
-	EventHandler DriverEventHandler
+	Config       *DriverConfig
+	EventHandler *DriverEventHandler
 }
 
 //DriverConfig contains configration of driver
@@ -276,7 +276,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 }
 
 //Init load configuration and serve response to API call
-func Init(config DriverConfig, eventHandler DriverEventHandler) *Driver {
+func Init(config *DriverConfig, eventHandler *DriverEventHandler) *Driver {
 	logrus.Debugf("Init basic driver at %s, UniqName: %v", config.Root, config.MountUniqName)
 	d := &Driver{
 		Config:       config,
