@@ -73,7 +73,7 @@ type Driver struct {
 	CfgFolder     string
 	Version       int
 	IsValidURI    func(string) bool
-	MountVolume   func(*Driver, *driver.Volume, *driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
+	MountVolume   func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
 }
 
 func (d *Driver) GetVolumes() map[string]driver.Volume {
@@ -243,7 +243,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 
-	resp, err := d.MountVolume(d, &v, &m, r)
+	resp, err := d.MountVolume(d, v, m, r)
 	if err != nil {
 		return nil, err
 	}
