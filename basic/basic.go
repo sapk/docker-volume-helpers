@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/sapk/docker-volume-helpers/driver"
@@ -40,9 +39,9 @@ func (d *Mountpoint) SetConnections(n int) {
 
 //Volume represent a docker volume
 type Volume struct {
-	VolumeURI   string `json:"voluri"`
-	Mount       string `json:"mount"`
-	Connections int    `json:"connections"`
+	Options     map[string]string `json:"options"`
+	Mount       string            `json:"mount"`
+	Connections int               `json:"connections"`
 }
 
 //GetMount get mount of volume
@@ -50,9 +49,9 @@ func (v *Volume) GetMount() string {
 	return v.Mount
 }
 
-//GetRemote get remote definition of volume
-func (v *Volume) GetRemote() string {
-	return v.VolumeURI
+//GetOptions get options definition of volume
+func (v *Volume) GetOptions() map[string]string {
+	return v.Options
 }
 
 //GetConnections get number of connection on volume
@@ -93,7 +92,7 @@ type DriverConfig struct {
 type DriverEventHandler struct {
 	IsValidURI    func(string) bool
 	OnInit        func(*Driver) error
-	GetMountName  func(d *Driver, r *volume.CreateRequest) string
+	GetMountName  func(d *Driver, r *volume.CreateRequest) (string, error)
 	OnMountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
 }
 
@@ -124,19 +123,11 @@ func (d *Driver) GetLock() *sync.RWMutex {
 func (d *Driver) Create(r *volume.CreateRequest) error {
 	logrus.Debugf("Entering Create: name: %s, options %v", r.Name, r.Options)
 
-	if r.Options == nil || r.Options["voluri"] == "" {
-		return fmt.Errorf("voluri option required")
-	}
-	r.Options["voluri"] = strings.Trim(r.Options["voluri"], "\"")
-	if !d.EventHandler.IsValidURI(r.Options["voluri"]) {
-		return fmt.Errorf("voluri option is malformated")
-	}
-
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 
 	v := &Volume{
-		VolumeURI:   r.Options["voluri"],
+		Options:     r.Options,
 		Mount:       d.EventHandler.GetMountName(d, r),
 		Connections: 0,
 	}
