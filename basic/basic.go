@@ -85,7 +85,6 @@ type Driver struct {
 type DriverConfig struct {
 	Version       int
 	Root          string
-	MountUniqName bool
 	Folder        string
 	CustomOptions map[string]interface{}
 }
@@ -94,6 +93,7 @@ type DriverConfig struct {
 type DriverEventHandler struct {
 	IsValidURI    func(string) bool
 	OnInit        func(*Driver) error
+	GetMountName  func(d *Driver, r *volume.CreateRequest) string
 	OnMountVolume func(*Driver, driver.Volume, driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
 }
 
@@ -137,7 +137,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 
 	v := &Volume{
 		VolumeURI:   r.Options["voluri"],
-		Mount:       GetMountName(d, r),
+		Mount:       d.EventHandler.GetMountName(d, r),
 		Connections: 0,
 	}
 
@@ -278,7 +278,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 
 //Init load configuration and serve response to API call
 func Init(config *DriverConfig, eventHandler *DriverEventHandler) *Driver {
-	logrus.Debugf("Init basic driver at %s, UniqName: %v", config.Root, config.MountUniqName)
+	logrus.Debugf("Init basic driver at %s", config.Root)
 	d := &Driver{
 		Config:       config,
 		Persistence:  viper.New(),
