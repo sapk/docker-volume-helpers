@@ -10,7 +10,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/sapk/docker-volume-helpers/basic"
 	"github.com/sapk/docker-volume-helpers/driver"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -260,16 +259,16 @@ func Init(root string, mountUniqName bool, CfgFolder string, CfgVersion int, isV
 		Root:          root,
 		MountUniqName: mountUniqName,
 		Persistence:   viper.New(),
-		Volumes:       make(map[string]*basic.Volume),
-		Mounts:        make(map[string]*basic.Mountpoint),
+		Volumes:       make(map[string]*Volume),
+		Mounts:        make(map[string]*Mountpoint),
 		CfgFolder:     CfgFolder,
 		Version:       CfgVersion,
 		IsValidURI:    isValidURI,
 		MountVolume:   mountVolume,
 	}
 
-	d.Persistence.SetDefault("volumes", map[string]*basic.Volume{})
-	d.Persistence.SetDefault("mounts", map[string]*basic.Mountpoint{})
+	d.Persistence.SetDefault("volumes", map[string]*Volume{})
+	d.Persistence.SetDefault("mounts", map[string]*Mountpoint{})
 	d.Persistence.SetConfigName("persistence")
 	d.Persistence.SetConfigType("json")
 	d.Persistence.AddConfigPath(CfgFolder)
@@ -282,18 +281,18 @@ func Init(root string, mountUniqName bool, CfgFolder string, CfgVersion int, isV
 		err := d.Persistence.UnmarshalKey("version", &version)
 		if err != nil || version != CfgVersion {
 			logrus.Warn("Unable to decode version of persistence, %v", err)
-			d.Volumes = make(map[string]*basic.Volume)
-			d.Mounts = make(map[string]*basic.Mountpoint)
+			d.Volumes = make(map[string]*Volume)
+			d.Mounts = make(map[string]*Mountpoint)
 		} else { //We have the same version
 			err := d.Persistence.UnmarshalKey("volumes", &d.Volumes)
 			if err != nil {
 				logrus.Warn("Unable to decode into struct -> start with empty list, %v", err)
-				d.Volumes = make(map[string]*basic.Volume)
+				d.Volumes = make(map[string]*Volume)
 			}
 			err = d.Persistence.UnmarshalKey("mounts", &d.Mounts)
 			if err != nil {
 				logrus.Warn("Unable to decode into struct -> start with empty list, %v", err)
-				d.Mounts = make(map[string]*basic.Mountpoint)
+				d.Mounts = make(map[string]*Mountpoint)
 			}
 		}
 	}
