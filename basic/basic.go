@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/sapk/docker-volume-helpers/driver"
@@ -70,6 +72,8 @@ type Driver struct {
 	Mounts        map[string]*Mountpoint
 	CfgFolder     string
 	Version       int
+	IsValidURI    func(string) bool
+	MountVolume   func(*Driver, *driver.Mount, *volume.MountRequest) (*volume.MountResponse, error)
 }
 
 func (d *Driver) GetVolumes() map[string]driver.Volume {
@@ -90,6 +94,56 @@ func (d *Driver) GetMounts() map[string]driver.Mount {
 
 func (d *Driver) GetLock() *sync.RWMutex {
 	return &d.Lock
+}
+
+//Create create and init the requested volume
+func (d *Driver) Create(r *volume.CreateRequest) error {
+	logrus.Debugf("Entering Create: name: %s, options %v", r.Name, r.Options)
+
+	if r.Options == nil || r.Options["voluri"] == "" {
+		return fmt.Errorf("voluri option required")
+	}
+	r.Options["voluri"] = strings.Trim(r.Options["voluri"], "\"")
+	if !d.IsValidURI(r.Options["voluri"]) {
+		return fmt.Errorf("voluri option is malformated")
+	}
+
+	d.GetLock().Lock()
+	defer d.GetLock().Unlock()
+
+	v := &Volume{
+		VolumeURI:   r.Options["voluri"],
+		Mount:       GetMountName(d, r),
+		Connections: 0,
+	}
+
+	if _, ok := d.Mounts[v.Mount]; !ok { //This mountpoint doesn't allready exist -> create it
+		m := &Mountpoint{
+			Path:        filepath.Join(d.Root, v.Mount),
+			Connections: 0,
+		}
+
+		_, err := os.Lstat(m.Path) //Create folder if not exist. This will also failed if already exist
+		if os.IsNotExist(err) {
+			if err = os.MkdirAll(m.Path, 0700); err != nil {
+				return err
+			}
+		} else if err != nil {
+			return err
+		}
+		isempty, err := FolderIsEmpty(m.Path)
+		if err != nil {
+			return err
+		}
+		if !isempty {
+			return fmt.Errorf("%v already exist and is not empty", m.Path)
+		}
+		d.Mounts[v.Mount] = m
+	}
+
+	d.Volumes[r.Name] = v
+	logrus.Debugf("Volume Created: %v", v)
+	return d.SaveConfig()
 }
 
 //List Volumes handled by these driver
@@ -172,4 +226,28 @@ func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
 		return nil, err
 	}
 	return &volume.PathResponse{Mountpoint: m.GetPath()}, nil
+}
+
+//Mount mount the requested volume
+func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
+	logrus.Debugf("Entering Mount: %v", r)
+
+	v, m, err := driver.MountExist(d, r.Name)
+	if err != nil {
+		return nil, err
+	}
+	if m != nil && m.GetConnections() > 0 {
+		return &volume.MountResponse{Mountpoint: m.GetPath()}, nil
+	}
+
+	d.GetLock().Lock()
+	defer d.GetLock().Unlock()
+
+	resp, err := d.MountVolume(d, &m, r)
+	if err != nil {
+		return nil, err
+	}
+	//time.Sleep(3 * time.Second)
+	driver.AddN(1, v, m)
+	return resp, d.SaveConfig()
 }
