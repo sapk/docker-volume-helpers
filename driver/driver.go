@@ -7,7 +7,7 @@ import (
 	"sync"
 
 	"github.com/docker/go-plugins-helpers/volume"
-	"github.com/sirupsen/logrus"
+	"github.com/rs/zerolog/log"
 )
 
 //Driver needed interface for some commons interactions
@@ -45,7 +45,7 @@ func getMount(d Driver, mPath string) (Mount, error) {
 	if !ok {
 		return nil, fmt.Errorf("mount %s not found", mPath)
 	}
-	logrus.Debugf("Mount found: %s", m)
+	log.Debug().Msgf("Mount found: %s", m)
 	return m, nil
 }
 
@@ -54,19 +54,19 @@ func getVolumeMount(d Driver, vName string) (Volume, Mount, error) {
 	if !ok {
 		return nil, nil, fmt.Errorf("volume %s not found", vName)
 	}
-	logrus.Debugf("Volume found: %s", v)
+	log.Debug().Msgf("Volume found: %s", v)
 	m, err := getMount(d, v.GetMount())
 	return v, m, err
 }
 
 //List wrapper around github.com/docker/go-plugins-helpers/volume
 func List(d Driver) (*volume.ListResponse, error) {
-	logrus.Debugf("Entering List")
+	log.Debug().Msgf("Entering List")
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 	var vols []*volume.Volume
 	for name, v := range d.GetVolumes() {
-		logrus.Debugf("Volume found: %s", v)
+		log.Debug().Msgf("Volume found: %s", v)
 		m, err := getMount(d, v.GetMount())
 		if err != nil {
 			return nil, err
@@ -78,7 +78,7 @@ func List(d Driver) (*volume.ListResponse, error) {
 
 //Get wrapper around github.com/docker/go-plugins-helpers/volume
 func Get(d Driver, vName string) (Volume, Mount, error) {
-	logrus.Debugf("Entering Get: name: %s", vName)
+	log.Debug().Msgf("Entering Get: name: %s", vName)
 	d.GetLock().RLock()
 	defer d.GetLock().RUnlock()
 	return getVolumeMount(d, vName)
@@ -86,7 +86,7 @@ func Get(d Driver, vName string) (Volume, Mount, error) {
 
 //Remove wrapper around github.com/docker/go-plugins-helpers/volume
 func Remove(d Driver, vName string) error {
-	logrus.Debugf("Entering Remove: name: %s", vName)
+	log.Debug().Msgf("Entering Remove: name: %s", vName)
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 	v, m, err := getVolumeMount(d, vName)
@@ -112,7 +112,7 @@ func Remove(d Driver, vName string) error {
 
 //MountExist wrapper around github.com/docker/go-plugins-helpers/volume
 func MountExist(d Driver, vName string) (Volume, Mount, error) {
-	logrus.Debugf("Entering MountExist: name: %s", vName)
+	log.Debug().Msgf("Entering MountExist: name: %s", vName)
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 	return getVolumeMount(d, vName)
@@ -134,7 +134,7 @@ func AddN(val int, oList ...increasable) {
 
 //Unmount wrapper around github.com/docker/go-plugins-helpers/volume
 func Unmount(d Driver, vName string) error {
-	logrus.Debugf("Entering Unmount: name: %s", vName)
+	log.Debug().Msgf("Entering Unmount: name: %s", vName)
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
 	v, m, err := getVolumeMount(d, vName)
@@ -157,7 +157,7 @@ func Unmount(d Driver, vName string) error {
 
 //Capabilities wrapper around github.com/docker/go-plugins-helpers/volume
 func Capabilities() *volume.CapabilitiesResponse {
-	logrus.Debugf("Entering Capabilities")
+	log.Debug().Msgf("Entering Capabilities")
 	return &volume.CapabilitiesResponse{
 		Capabilities: volume.Capability{
 			Scope: "local",

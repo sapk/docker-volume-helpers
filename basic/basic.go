@@ -9,11 +9,12 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/sapk/docker-volume-helpers/driver"
-	"github.com/sirupsen/logrus"
+	"github.com/docker/go-plugins-helpers/volume"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 
-	"github.com/docker/go-plugins-helpers/volume"
+	"github.com/sapk/docker-volume-helpers/driver"
+	"github.com/sapk/docker-volume-helpers/tools"
 )
 
 //Mountpoint represent a docker volume mountpoint
@@ -132,7 +133,7 @@ func (d *Driver) GetLock() *sync.RWMutex {
 
 //Create create and init the requested volume
 func (d *Driver) Create(r *volume.CreateRequest) error {
-	logrus.Debugf("Entering Create: name: %s, options %v", r.Name, r.Options)
+	log.Debug().Str("name", r.Name).Msgf("Entering Create: %v", r.Options)
 
 	d.GetLock().Lock()
 	defer d.GetLock().Unlock()
@@ -161,7 +162,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 		} else if err != nil {
 			return err
 		}
-		isempty, err := FolderIsEmpty(m.Path)
+		isempty, err := tools.FolderIsEmpty(m.Path)
 		if err != nil {
 			return err
 		}
@@ -172,7 +173,7 @@ func (d *Driver) Create(r *volume.CreateRequest) error {
 	}
 
 	d.Volumes[r.Name] = v
-	logrus.Debugf("Volume Created: %v", v)
+	log.Debug().Msgf("Volume Created: %v", v)
 	return d.SaveConfig()
 }
 
@@ -207,12 +208,12 @@ func (d *Driver) Capabilities() *volume.CapabilitiesResponse {
 
 //RunCmd run deamon in context of this gvfs drive with custome env
 func (d *Driver) RunCmd(cmd string) error {
-	logrus.Debugf(cmd)
+	log.Debug().Str("command", cmd).Msg("RunCmd")
 	out, err := exec.Command("sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		logrus.Warnf("Error: %s", err)
+		log.Warn().Err(err)
 	}
-	logrus.Warnf("Output: %s", out)
+	log.Debug().Msgf("Output: %s", out)
 	return err
 }
 
@@ -238,12 +239,11 @@ func (d *Driver) SaveConfig() error {
 	}
 	b, err := json.Marshal(Persistence{Version: d.Config.Version, Volumes: d.Volumes, Mounts: d.Mounts})
 	if err != nil {
-		logrus.Warn("Unable to encode Persistence struct, %v", err)
+		log.Warn().Err(err).Msg("Unable to encode Persistence struct")
 	}
-	//logrus.Debug("Writing Persistence struct, %v", b, d.Volumes)
 	err = ioutil.WriteFile(d.Config.Folder+"/persistence.json", b, 0600)
 	if err != nil {
-		logrus.Warn("Unable to write Persistence struct, %v", err)
+		log.Warn().Err(err).Msg("Unable to write Persistence struct")
 		return fmt.Errorf("SaveConfig: %s", err)
 	}
 	return nil
@@ -260,7 +260,7 @@ func (d *Driver) Path(r *volume.PathRequest) (*volume.PathResponse, error) {
 
 //Mount mount the requested volume
 func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
-	logrus.Debugf("Entering Mount: %v", r)
+	log.Debug().Msgf("Entering Mount: %v", r)
 
 	v, m, err := driver.MountExist(d, r.Name)
 	if err != nil {
@@ -284,7 +284,7 @@ func (d *Driver) Mount(r *volume.MountRequest) (*volume.MountResponse, error) {
 
 //Init load configuration and serve response to API call
 func Init(config *DriverConfig, eventHandler *DriverEventHandler) *Driver {
-	logrus.Debugf("Init basic driver at %s", config.Root)
+	log.Debug().Msgf("Init basic driver at %s", config.Root)
 	d := &Driver{
 		Config:       config,
 		Persistence:  viper.New(),
@@ -299,32 +299,32 @@ func Init(config *DriverConfig, eventHandler *DriverEventHandler) *Driver {
 	d.Persistence.SetConfigType("json")
 	d.Persistence.AddConfigPath(d.Config.Folder)
 	if err := d.Persistence.ReadInConfig(); err != nil { // Handle errors reading the config file
-		logrus.Warn("No persistence file found, I will start with a empty list of volume.", err)
+		log.Warn().Msgf("No persistence file found, I will start with a empty list of volume : %v", err)
 	} else {
-		logrus.Debug("Retrieving volume list from persistence file.")
+		log.Debug().Msg("Retrieving volume list from persistence file.")
 
 		var version int
 		err := d.Persistence.UnmarshalKey("version", &version)
 		if err != nil || version != d.Config.Version {
-			logrus.Warn("Unable to decode version of persistence, %v", err)
+			log.Warn().Msgf("Unable to decode version of persistence, %v", err)
 			d.Volumes = make(map[string]*Volume)
 			d.Mounts = make(map[string]*Mountpoint)
 		} else { //We have the same version
 			err := d.Persistence.UnmarshalKey("volumes", &d.Volumes)
 			if err != nil {
-				logrus.Warn("Unable to decode into struct -> start with empty list, %v", err)
+				log.Warn().Msgf("Unable to decode into struct -> start with empty list, %v", err)
 				d.Volumes = make(map[string]*Volume)
 			}
 			err = d.Persistence.UnmarshalKey("mounts", &d.Mounts)
 			if err != nil {
-				logrus.Warn("Unable to decode into struct -> start with empty list, %v", err)
+				log.Warn().Msgf("Unable to decode into struct -> start with empty list, %v", err)
 				d.Mounts = make(map[string]*Mountpoint)
 			}
 		}
 	}
 	if d.EventHandler.OnInit != nil {
 		if err := d.EventHandler.OnInit(d); err != nil {
-			logrus.Fatalf("Failed to execute OnInit event handler", err)
+			log.Fatal().Msgf("Failed to execute OnInit event handler: %v", err)
 		}
 	}
 	return d
